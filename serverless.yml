@@ -1,0 +1,24 @@
+service: aws-ses-lambda-pup
+provider:
+    name: aws
+    profile: mylocal
+    runtime: nodejs8.10
+    region: us-east-1
+
+plugins:
+    - serverless-plugin-chrome
+    - serverless-offline
+
+package:
+    exclude:
+        - node_modules/puppeteer/.local-chromium/**
+
+functions:
+    getEmail:
+        handler: handler.unsubscribe
+        memorySize: 1536MB
+        timeout: 30
+        events:
+            - http:
+                  path: /
+                  method: get
