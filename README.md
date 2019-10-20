@@ -5,7 +5,7 @@ End to end testing for casl service using serverless, lambda, puppeteer, s3 and 
 1. Receive incoming emails from SES 
 2. Store in s3 
 3. Lambda will pick up the email and parse 
-4. Puppeeter will run test for unsubscribe 
+4. Puppeteer will execute unsubscribe flow 
 5. Verify unsubscribe from 3rd party services (intercom, salesforce)
 
 ## Getting started 

@@ -1,6 +1,10 @@
 const launchChrome = require('@serverless-chrome/lambda');
 const request = require('request-promise');
 const puppeteer = require('puppeteer');
+const Helper = require('./helpers');
+const assertions = require('./assertion');
+const unsubscribeSelectors = require('./selectors');
+const config = require('./config');
 const log = console.log;
 
 /**
@@ -23,8 +27,8 @@ const getChrome = async () => {
   const response = await request.get(options).then(res => JSON.parse(res));
   const endpoint = response.webSocketDebuggerUrl;
 
-  log('Successfully retrieved socked endpoint url');
-  return  {
+  log('Retrieving chrome browser');
+  return {
     endpoint,
     instance: chrome,
   };
@@ -37,12 +41,10 @@ const getChrome = async () => {
  * @param page - browser new page
  * @returns {Promise<*>}
  */
-async function getClick(page, selector) {
+async function click(page, selector) {
   return await page.evaluate((elementSelector) =>
     document.querySelector(elementSelector).click(), selector);
-
 }
-
 
 /**
  * Initiate unsubscribe flow to unsubscribe users from marketing emails
@@ -50,29 +52,37 @@ async function getClick(page, selector) {
  * @returns {Promise<void>}
  */
 
-async function unsubscribeFlow(url) {
+async function unsubscribeFlow(urls) {
+  const helper = new Helper();
+  let actual;
+
   const chrome = await getChrome();
   const browser = await puppeteer.connect({
     browserWSEndpoint: chrome.endpoint,
   });
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1366, height: 768});
 
-  await page.goto(url, { waitUntil: 'networkidle0' });
-  await page.goto(url);
-  await page.waitFor(1000);
-  console.log('Successfully loaded the homepage');
-  const unsubHeader= await page.evaluate(() =>
-    document.querySelector('#lp-pom-text-133 > h1 > span').innerHTML); //header
-  console.log(unsubHeader);
-  await page.type('#email', 'rbcventuresplatform@gmail.com'); //email text field
-  console.log('Successfully typed email');
-  await getClick(page, '#untitled3_please_unsubscribe_me_from_all_just_liv_promotional_emails');
-  console.log('Successfully selected unsub checkbox');
-  await page.waitFor(1000);
-  await getClick(page, '#lp-pom-button-137 > span');
-  console.log('Successfully submitted unsubscribe');
+  for (const url of urls) {
+    log('Starting unsubscribe flow...');
+    const page = await browser.newPage();
+    await page.setViewport({width: config.puppeteer.width, height: config.puppeteer.height});
+
+    await page.goto(url, {waitUntil: config.puppeteer.waitUntil});
+    await page.goto(url);
+    await page.waitFor(config.puppeteer.pageWaitTime);
+    log(`Successfully loaded the homepage ${url}`);
+    actual = await page.evaluate((selector) =>
+      document.querySelector(selector).innerHTML, unsubscribeSelectors.header);
+    helper.assertion(assertions.unsubscribe.header, actual);
+    await page.type(unsubscribeSelectors.emailField, config.user.email);
+    await page.waitFor(config.puppeteer.pageWaitTime);
+    await click(page, unsubscribeSelectors.submitButton);
+    await page.waitFor(config.puppeteer.pageWaitTime);
+    //TODO: Assertion for the confirmation pop up
+    log('Successfully submitted unsubscribe');
+
+    page.close();
+  }
 
   browser.close();
 }
